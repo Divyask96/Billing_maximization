@@ -1,0 +1,546 @@
+---
+title: "Proj"
+author: "Divya Kommi"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    extra_dependencies: ["float"]
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "")
+library(ompr, quietly = TRUE)
+library(magrittr, quietly = TRUE)
+library(pander, quietly = TRUE)
+library(ROI, quietly = TRUE)
+library(ROI.plugin.glpk, quietly = TRUE)
+library(ompr.roi, quietly = TRUE)
+library (devtools)
+library(Benchmarking, quietly=TRUE)
+library(ROI.plugin.glpk)
+library(ROI.plugin.lpsolve)
+library(ROI.plugin.neos)
+library(ROI.plugin.symphony)
+library(readr)
+```
+
+# Introduction
+
+Despite increasing efficiency in the legal services industry, billing optimization and realization have remained a problem.
+There is less time spent on travel (and overall delays) and attorneys are given more convenient ways to meet with their clients.
+One might expect an increase in efficiency to lead towards increase in profits, but that has not necessarily been the case.
+Most firms turn towards increasing billable hours and rates to increase profits, but this can have major setbacks.
+If firms can't increase the hours per month of their lawyers and the rising price of new layers is unpalatable, how are firms to increase revenue?
+(2) Our project is going to focus on answering this question.
+
+For our study, we are focusing on the employees, their billing rates, and their average hours.
+We are going to randomly pull a small subset of billable employees, and allocate them across a set of jobs based on their billing data.
+All of this will work within our utilization and allocation constraints, where we attempt to work within the desired and expected hours of our employee sample.
+While an optimization model can demonstrate the best way to increase profit by utilizing our staff in the most efficient way possible, it can reveal or suggest some harsh realities about staff allocation that we will further explore in our report.
+
+An increasingly digitized landscape is not going to single handedly improve business operations.
+We decided to look towards increasing our billing maximization by managing our resources more effectively.
+Our resources in this case would be the billable employees themselves.
+In this report, we will demonstrate and walk through our process for creating a model that focuses on maximizing profit by assigning employees to jobs based on their billing rates and classifications.
+
+# Research
+
+Within our firm, four key metrics are used for determining financial performance; billable hours, fees billed, value of time worked, and fees collected.
+Their metrics are examined thoroughly every week to ensure that the firm is operating smoothly.
+For our model, we chose to focus mostly on billable hours.
+In an analysis of declining 2022 hours billed in legal services, Joel Webber claims that billed hour production is the predominant force in generating law firm profits or losses (2).
+
+An analysis performed by Thomson Reuters looked closely at Q2 2022 financial trends across the entire legal services industry and found that only 91% of billable hours are being billed.
+A study performed by the editorial team at Albatross made the same claim.
+Firms are losing out on a significant portion of revenue because of this issue with realization.
+At our firm, we are currently sitting at around 89% realization for 2022.
+There are several contributors to this, but the biggest one would be lawyers not billing for all their time.
+Our firm bills in 1/10-hour increments to ensure that everything is billed for appropriately, even the brief meetings with clients.
+
+The Reuters analysis suggests that outright increasing billable hours (and billable rates) can be a bad thing because it will decrease client satisfaction.
+Webber describes this phenomenon as "explicit rate increases as revenue-enhancement moves so obvious to corporate clients that they are likely to reject them out of hand" (2).
+Interestingly enough, our research led us towards a financial model designed by York Faulkner, the founding partner YMF Law, that focuses on decreasing billable hours to increase profit.
+His firm was able to achieve a 90% realization rate by discounting billed hours by around 25%.
+
+Faulkner's model served as a key inspiration for developing our model because it highlighted the power of working with billable hours.
+It was also refreshing to see a model developed by someone who has nearly a decade of experience operating a law firm.
+In describing his analysis, Faulkner claims that the billable hour is the primary unit for billing clients and measuring law firm performance (1), which aligns perfectly with what we found in the Webber analysis.
+It also claimed that few law firms combine the billable hour metric with their cost accounting, which results in these firms not fully understanding the relationship between billable hours and expenses.
+Our firm does an excellent job of tracking expenses, but unfortunately, we do not tie this into our billable hour production.
+It's still interesting to see what Faulkner can do with this effective combination.
+He is able to develop a complex system that assigns costs to attorneys based on their associate/partner status.
+We believe that such a system would be difficult to implement in a firm that doesn't meet the pre-mentioned criteria, but it's still fascinating to see that something like this is possible.
+It would be a fantastic topic for further research or potential next steps.
+
+Faulkner describes an issue that some firms deal with as an hourly billing rate trap (1).
+This will often come as a result of the realization issues discussed earlier.
+Attorneys do not record all time spent on their projects, which leads to some time being unbilled.
+At our firm, this remains a huge issue.
+Less time being billed will sometimes lead to hourly cost rates going up, and then firms will increase billing rates to accommodate for this.
+To maintain profitability at increased cost rates, firms often look towards increasing billing rates, which over-constrains the firm into meeting client expectations.
+
+After reading through these studies and analyses, it became clear that billing maximization was fully reachable through careful planning of resources and good optimization.
+Multiple sources suggested the impact of billable hours on profit, but also examined the drawbacks of working with billable hours.
+Simply increasing hours billed is going to reduce client demand and increasing our employees' billable rates is going to have a similar effect.
+While our model is going to closely examine billable hours for different employees, we are not going to try and increase these hours, but more so efficiently allocate them.
+
+# Methodology
+
+-   With all of this in mind, we were able to develop a methodology that would form the basis for our model.
+
+-   Begin by obtaining data from the law firm and arranging it into tables that can be easily interpreted and analyzed.
+    The firm data would consist of 20 employees (from a population of around 250), as well as the corresponding employees' rank, billing rates, average billable hours, and their hourly range taken across a period of 6 years.
+    Data would also include expected hourly inputs for five upcoming large-scale jobs.
+
+-   Develop mathematical models based on feedback and suggestions from Professor Anderson (5) and Riad Alharithi (6).
+    Ensure that all decision variables and constraints meet all requirements.
+
+-   The data was rearranged into several different matrices, and then moved into CSV files for our R input.
+
+-   After running our model (and variations of the model) in R, we analyzed our findings and determined potential next steps.
+
+# Model Formulation
+
+## Assumptions
+
+The team simplified the project with the following assumptions:
+
+-   Out of 250 law firm employees, we took a sample of 20 employees which had a mix of paralegal, equity partner, non-equity partner, associate and special counsel.
+
+-   In each month, we have assumed that the firm tends to cater to 5 projects with different employee requirements.
+
+-   The hours required based on each employee rank are randomly generated to match the available monthly hours for each rank.
+
+-   The monthly hours an employee works should be no greater or smaller than the historical range of hours that they have worked per month over the past 6 months of data.
+
+## Data
+
+-   n = 20 \# Number of employees
+
+-   p = 5 \# Number of projects in a given month
+
+-   c = 5 \# Number of job titles
+
+-   $P_{i,k}$ - Profit of an employee working 'i' hours based on classification 'k'
+
+-   $S_{i,k}$- Binary classification variable by job title and employee
+
+-   $H_{j,k}$ - Total hours by project and by classification
+
+-   $R_{i,k}$ - Billing ratio (effective rate/std.rate) for each employee based on classification
+
+-   $MaxR_i$ - Maximum monthly hours that employee i worked over past 6 month range.
+
+-   $MinR_i$ - Minimum monthly hours that employee i worked over past 6 month range.
+
+## Decision Variables
+
+-   $x_{i,j,k}$ - hours 'x' that an employee 'i' either paralegal or attorney works for a project 'j'
+
+-   $y_{i,j,k}$ - a binary variable to determine if employee is assigned on a project with a specific classification
+
+## Constraints
+
+-   Min & max hours constraint for each employee (monthly). This constraint is incorporated to keep make sure the work-life balance of the employees is not disturbed. This makes sure the to assign the hours to each employee based on their monthly working hour limits.
+
+$$
+\begin{split}
+\begin{aligned}
+&\sum_{j=1}^p\sum_{k=1}^cx_{i,j,k} \leq MaxR_i \; hours\;\forall \; i\\
+&\sum_{j=1}^p\sum_{k=1}^cx_{i,j,k} \geq MinR_i \; hours\;\forall \; i\\
+\end{aligned}
+\end{split}
+$$
+
+-   Linking constraint (Big M = Available hours in a project)
+
+$$
+\begin{split}
+\begin{aligned}
+&x_{i,j,k} \leq H_{j,k} \cdot y_{i,j,k}\; \forall \; i,j,k\\
+\end{aligned}
+\end{split}
+$$
+
+-   Classification constraint
+
+$$
+\begin{split}
+\begin{aligned}
+&y_{i,j,k} \leq S_{i,k}\; \forall \; i,j,k\\
+\end{aligned}
+\end{split}
+$$
+
+-   The sum of hours worked by all employees equals the sum total of project hours required
+
+$$
+\begin{split}
+\begin{aligned}
+&\sum_{i=1}^n x_{i,j,k} = H_{j,k}\; \forall \; j,k\\
+\end{aligned}
+\end{split}
+$$
+
+## Objective Function
+
+Two objective were identified and formulated as below:
+
+1.  To maximize the profit by multiplying the profit per hour per class ($P_{i,k}$) by the assigned number of hours to the employee (i).
+
+$$
+\begin{split}
+\begin{aligned}
+\text{Max    } &\sum_{i=1}^n\sum_{j=1}^p\sum_{k=1}^c x_{i,j,k} \cdot P_{i,k} &\text{[Maximize Profit]}\\
+\end{aligned}
+\end{split}
+$$
+
+2.  To maximize the average ratio of billable/non billable hours by multiplying the ratio per employee per class by the number of hours assigned to the employee(i) and dividing by the total number of hours (2059).
+
+$$
+\begin{split}
+\begin{aligned}
+\text{Max    } &(\sum_{i=1}^n\sum_{j=1}^p\sum_{k=1}^c x_{i,j,k} \cdot R_{i,k})/2059 &\text{[Maximize Billing Ratio]}\\
+\end{aligned}
+\end{split}
+$$
+
+## Full LaTeX Formulation
+
+### Model 1
+
+In this variation, we have used the first objective function of maximizing profit and the four constraints that are listed above. Initially, when we execute the model without limiting the working hours to be within the employees existing monthly range, the optimized model suggested to utilize highest billing employees to increase the profit. As this is not a feasible solution, we are trying to optimize the profit without disturbing the existing working range of the employees.
+
+$$
+ \begin{split}
+ \begin{aligned}
+    \text{Max    } & \sum_{i=1}^n\sum_{j=1}^p\sum_{k=1}^c x_{i,j,k} \cdot P_{i,k} &\text{[Maximize Profit]}\\
+    \text{s.t.:  } & \sum_{j=1}^p\sum_{k=1}^cx_{i,j,k} \leq MaxR_i \; hours\;\forall \; i &\text{[Constraints]}\\
+                   & \sum_{j=1}^p\sum_{k=1}^cx_{i,j,k} \geq MinR_i \; hours\;\forall \; i\\
+                   & x_{i,j,k} \leq H_{j,k} \cdot y_{i,j,k}\; \forall \; i,j,k\\
+                   & y_{i,j,k} \leq S_{i,k}\; \forall \; i,j,k\\
+                   & \sum_{i=1}^n x_{i,j,k} = H_{j,k}\; \forall \; j,k\\
+                   & x_{i,j,k} \geq 0 \; \forall \; i,j,k\\
+                   & y_{i,j,k} \; \in  0,1
+  \end{aligned}
+  \end{split}
+$$
+
+### Model 2
+
+In this variation, we have used the second objective function to maximize the ratio of billable to non billable hours. As per literature study, we have learned that increasing the billable hours per project or by increasing the billing ratio, the customer satisfaction is going down and that is not a feasible solution. As the firm under study is experiencing issue with some of hours not being billed, we tried to optimize that ratio of billable to non billable hours.
+
+$$
+ \begin{split}
+ \begin{aligned}
+    \text{Max    } & (\sum_{i=1}^n\sum_{j=1}^p\sum_{k=1}^c x_{i,j,k} \cdot R_{i,k})/2059 &\text{[Maximize Average Billing Ratio]}\\
+    \text{s.t.:  } & \sum_{j=1}^p\sum_{k=1}^cx_{i,j,k} \leq MaxR_i \; hours\;\forall \; i &\text{[Constraints]}\\
+                   & \sum_{j=1}^p\sum_{k=1}^cx_{i,j,k} \geq MinR_i \; hours\;\forall \; i\\
+                   & x_{i,j,k} \leq H_{j,k}\cdot y_{i,j,k}\; \forall \; i,j,k\\
+                   & y_{i,j,k} \leq S_{i,k}\; \forall \; i,j,k\\
+                   & \sum_{i=1}^n x_{i,j,k} = H_{j,k}\; \forall \; j,k\\
+                   & x_{i,j,k} \geq 0 \; \forall \; i,j,k\\
+                   & y_{i,j,k} \; \in  0,1
+  \end{aligned}
+  \end{split}
+$$
+
+### Model 3 - Minimax of Model 1 & Model 2
+
+In this variation, we are trying to minimize the maximum deviation from the previous two models objective function values. As we are trying to minimize the maximum deviation, it is referred to as "Minimax" model. Unlike linear programming models and the Simplex method, this method allows multiple objective functions. We are introducing a new variable, Q that must be at least as large as the largest miss. The target variables are referred as T1 and T2, which are nothing but objective function values from previous two models. The deviation variables are defined as d1 and d2. 
+ 
+
+$$
+ \begin{split}
+ \begin{aligned}
+    \text{Min    } & Q &\text{[Minimize Max Target Deviation]}\\
+    \text{s.t.:  } & \sum_{j=1}^p\sum_{k=1}^cx_{i,j,k} \leq MaxR_i \; hours\;\forall \; i &\text{[Constraints]}\\
+                    & \sum_{j=1}^p\sum_{k=1}^cx_{i,j,k} \geq MinR_i \; hours\;\forall \; i\\
+                   & x_{i,j,k} \leq H_{j,k} \cdot y_{i,j,k}\; \forall \; i,j,k\\
+                   & y_{i,j,k} \leq S_{i,k}\; \forall \; i,j,k\\
+                   & \sum_{i=1}^n x_{i,j,k} = H_{j,k}\; \forall \; j,k\\
+                   & Q \geq d_1/T_1 \\
+                   & Q \geq d_2/T_2 \\
+                   & \sum_{i=1}^n\sum_{j=1}^p\sum_{k=1}^c x_{i,j,k}\cdot P_{i,k}\;+\;d1 =T_1\\
+                   & ((\sum_{i=1}^n\sum_{j=1}^p\sum_{k=1}^c x_{i,j,k}\cdot R_{i,k})/2059)\;+\;d2 =T_2 \\
+                   & x_{i,j,k} \geq 0 \; \forall \; i,j,k\\
+                   & y_{i,j,k} \; \in  0,1
+  \end{aligned}
+  \end{split}
+$$
+
+# Model Implementation
+
+## Read Data files and define variables
+
+```{r readData, echo= FALSE, message=FALSE, warning=FALSE, include=TRUE}
+Input_Hours<- readr::read_csv(".\\Input\\ProjReq.csv")
+Input_Rank<- readr::read_csv(".\\Input\\EmployeeRank.csv")
+Input_Rate<-readr::read_csv(".\\Input\\BillingRate.csv")
+Input_Ratio <-readr::read_csv(".\\Input\\BillingRatio.csv")
+
+S<-t(Input_Rank)
+H<-t(Input_Hours)
+P<-t(Input_Rate)
+R<-t(Input_Ratio)
+
+Max_r <- c(194,127,62,143,161,186,171,129,182,122,132,139,124,119,133,169,160,195,166,28)
+##maximum working hours of each employee based on past 6 months data
+
+Min_r <- c(78,72,21,67,110,137,103,29,146,80,81,36,81,72,63,117,129,76,99,19)
+##minimum working hours of each employee based on past 6 months data
+
+n<- 20
+##number of employees
+
+p<- 5
+##number of projects in a given month
+
+c<- 5
+##number of job titles
+
+```
+
+## Model 1 - Maximize Profit
+
+```{r model, include = TRUE}
+
+model <- MIPModel()
+model<- add_variable(model, X[i,j,k], i=1:n, j=1:p, k=1:c, lb=0, type= "continuous")
+## This variable is to determine the number of hours assigned to an employee 
+##on each project with specific classification
+
+model<- add_variable(model, Y[i,j,k], i=1:n, j=1:p, k=1:c, type = "binary")
+## a binary variable to determine if employee is assigned on a project 
+##with a specific classification
+
+model<- add_constraint(model,sum_expr(X[i,j,k], j=1:p, k=1:c) <= Max_r[i], i=1:n)
+##No employee works more than their historical maximum.
+
+model<- add_constraint(model,sum_expr(X[i,j,k], j=1:p, k=1:c) >= Min_r[i], i=1:n)
+##No employee works less than their historical  minimum.
+
+model<- set_objective(model, sum_expr((X[i,j,k]*P[i,k]), i=1:n, j=1:p, k=1:c), "max")
+## our objective is to maximize the profit by multiplying the profit per hour per class (P[i,k]) 
+##by the assigned hours to employee i (X[i,j])
+
+model<- add_constraint (model, Y[i,j,k]<=S[i,k], i=1:n, j=1:p, k=1:c)
+##No employee can work hours that they are not qualified to perform
+
+model<- add_constraint(model,sum_expr(X[i,j,k],i=1:n) == H[j,k], j=1:p, k=1:c)
+## All project hours are worked
+
+model<- add_constraint (model, X[i,j,k]<=H[j,k]*Y[i,j,k], i=1:n, j=1:p, k=1:c)
+##constraints of Big M : linking X[i,j,l] to Y[i,j,k]
+
+## Variable & Constraint to track billable hours ratio in model where ratio is not objective
+## Note: Does not actually constrain model at all
+model<- add_variable(model, Rat,lb=0, type= "continuous")
+model<- add_constraint (model, sum_expr((X[i,j,k]*R[i,k]), i=1:n, j=1:p, k=1:c)/(2059) == Rat)
+
+result <- solve_model(model, with_ROI(solver = "glpk"))
+##Solve the model
+
+result
+
+```
+
+```{r Employee_output, include = FALSE, echo = FALSE}
+
+WorkerData <- get_solution(result,Y[i,j,k])
+
+HoursData <- get_solution(result,X[i,j,k])
+
+```
+
+## Model 2 - Maximize Billing Ratio
+
+```{r model2, include = TRUE}
+
+model2 <- MIPModel()
+
+model2<- add_variable(model2, X[i,j,k], i=1:n, j=1:p, k=1:c, lb=0, type= "continuous")
+## This variable is to determine the number of hours assigned to an employee 
+##on each project with specific classification
+
+model2<- add_variable(model2, Y[i,j,k], i=1:n, j=1:p, k=1:c, type = "binary")
+## a binary variable to determine if employee is assigned on a project 
+##with a specific classification
+
+model2<- set_objective(model2, sum_expr((X[i,j,k]*R[i,k]), i=1:n, j=1:p, k=1:c)/(2059), "max")
+## our objective is maximize the average ratio of billed to non billed hours 
+##by taking the average of ratio. 
+
+model2<- add_constraint(model2,sum_expr(X[i,j,k], j=1:p, k=1:c) <= Max_r[i], i=1:n)
+##No employee can work more than historical max.
+
+model2<- add_constraint(model2,sum_expr(X[i,j,k], j=1:p, k=1:c) >= Min_r[i], i=1:n)
+##No employee can work less than historical min.
+
+model2<- add_constraint (model2, Y[i,j,k]<=S[i,k], i=1:n, j=1:p, k=1:c)
+##No employee can work hours that they are not qualified to perform
+
+model2<- add_constraint(model2,sum_expr(X[i,j,k],i=1:n) == H[j,k], j=1:p, k=1:c)
+## no employee can be assigned more hours than the hours that are set in the project 
+##for that classification.
+
+model2<- add_constraint (model2, X[i,j,k]<=H[j,k]*Y[i,j,k], i=1:n, j=1:p, k=1:c)
+##constraints of Big M : linking X[i,j,k] to Y[i,j,k]
+
+
+## Variable & Constraint to track Profit in model where ratio is not objective
+## Note: Does not actually constrain model at all
+model2<- add_variable(model2, Prof,lb=0, type= "continuous")
+model2<- add_constraint (model2, sum_expr((X[i,j,k]*P[i,k]), i=1:n, j=1:p, k=1:c) == Prof)
+
+result2 <- solve_model(model2, with_ROI(solver = "glpk"))
+##Solve the model
+result2
+```
+
+```{r Employee_output2, include = FALSE, echo = FALSE}
+
+WorkerData2 <- get_solution(result2,Y[i,j,k])
+
+HoursData2 <- get_solution(result2,X[i,j,k])
+
+```
+
+## Model 3 - Minimize the Max % Deviation from 1st and 2nd objective function values
+
+```{r model3, include = TRUE}
+
+T1 <- result$objective_value
+## Target variable 1
+
+T2 <- result2$objective_value
+## Target variable 2
+
+model3 <- MIPModel()
+
+model3 <-add_variable(model3, VQ, type = "continuous",lb = 0)
+## Add variable for max deviation from target
+
+model3 <-add_variable(model3, Vd1, type = "continuous",lb = 0)
+## Add variable for deviation from T1
+
+model3 <-add_variable(model3, Vd2, type = "continuous",lb = 0)
+## Add variable for deviation from T1
+
+model3<- add_variable(model3, X[i,j,k], i=1:n, j=1:p, k=1:c, lb=0, type= "continuous")
+## This variable is to determine the number of hours assigned to an employee 
+##on each project with specific classification
+
+model3<- add_variable(model3, Y[i,j,k], i=1:n, j=1:p, k=1:c, type = "binary")
+## a binary variable to determine if employee is assigned on a project 
+##with a specific classification
+
+model3<- set_objective(model3, VQ, "min")
+## our objective is to minimize max deviation from target (Q)
+
+model3<- add_constraint (model3, Y[i,j,k]<=S[i,k], i=1:n, j=1:p, k=1:c)
+##No employee can work hours that they are not qualified to perform
+
+model3<- add_constraint(model3,sum_expr(X[i,j,k], j=1:p, k=1:c) <= Max_r[i], i=1:n)
+##No employee can work more than historical max.
+
+model3<- add_constraint(model3,sum_expr(X[i,j,k], j=1:p, k=1:c) >= Min_r[i], i=1:n)
+##No employee can work less than historical min.
+
+model3<- add_constraint(model3,sum_expr(X[i,j,k],i=1:n) == H[j,k], j=1:p, k=1:c)
+## no employee can be assigned more hours than the hours that are set in the project 
+##for that classification.
+
+model3<- add_constraint (model3, X[i,j,k]<=H[j,k]*Y[i,j,k], i=1:n, j=1:p, k=1:c)
+##constraints of Big M : linking X[i,j,l] to Y[i,j,k]
+
+model3 <-add_constraint(model3, VQ>=Vd1/T1)
+## Q is less than or equal to the percent deviation from model 1
+
+model3 <-add_constraint(model3, VQ>=Vd2/T2)  
+## Q is less than or equal to the deviation from model 2
+
+model3 <- add_constraint(model3,
+                        sum_expr((X[i,j,k]*P[i,k]), i=1:n, j=1:p, k=1:c)+ Vd1 == T1)
+## Objective function from model 1 + Deviation = target from model 1
+
+model3 <- add_constraint(model3, 
+                        sum_expr((X[i,j,k]*R[i,k]), i=1:n, j=1:p, k=1:c)/(2059)+ Vd2==T2)
+## Objective function from model 2 + Deviation = target from model 2
+
+model3<- add_variable(model3, Prof,lb=0, type= "continuous")
+model3<- add_constraint (model3, sum_expr((X[i,j,k]*P[i,k]), i=1:n, j=1:p, k=1:c) == Prof)
+
+result3 <- solve_model(model3, with_ROI(solver = "glpk"))
+## Solve model
+result3
+
+```
+
+```{r Employee_output4, include = FALSE, echo = FALSE}
+
+HoursData3 <- get_solution(result3,X[i,j,k])
+
+```
+
+## Write Output to CSV
+```{r exportData , include = TRUE}
+write.csv(HoursData, ".\\Output\\XIJ1.csv")
+write.csv(HoursData2, ".\\Output\\XIJ2.csv")
+write.csv(HoursData3, ".\\Output\\XIJ3.csv")
+```
+
+\newpage
+# Model Results and Discussion
+
+## Model 1 - Maximize Revenue
+
+![Model 1 Result](img/Model1_Result.PNG)
+
+\newpage
+
+## Model 2 - Maximize Ratio of Billable/Non-Billable Hours
+
+![Model 2 Result](img/Model2_Result.PNG)
+
+\newpage
+
+## Model 3 - Minimize Maximum Deviation from Goal Targets
+
+![Model 3 Result](img/Model3_Result.PNG)
+
+\newpage
+
+# Challenges
+
+-  We have defined all the variables as continuous variables, hence the minimax model suggested to assign continuous hours to an employee. So, we tried implementing the model by changing decision variable from continuous to integer. This added to the computational complexity, and hence the model ran for more than 5 hours.
+
+-  Initially, when we use a constraint to limit all the employee work hours to be 150 per month, we neglected the existing working hours range of each employee. Based on the varying levels of experience, some employees are working just 24 hours per month, while some are working 143 hours a month on average.
+
+-  By utilizing the above listed constraint, the optimized model suggested to not assign any hours for 5 out of 20 employees. This solution shows that the firm is overstaffed. So, we tried looking at the average working range of each employee and incorporated the minimum and maximum ranges in the model. With this, we were able to obtain a solution that optimizes profit and billing ratio, without disrupting the existing work life balance of the employees.
+
+# Next Steps
+
+**Seniority Differentiator**
+
+-  York Faulkner was able to develop a system that weights employees based on their associate/partner status. This was brought up during one of our class sessions, and at the time we thought it could not be done. Faulkner demonstrates that with a certain accounting setup, this weighting is very possible. With how our firm's accounting system works, we would not be able to apply Faulkner's system, but it's still interesting to see that this can actually be done. This would be an excellent choice for future work.
+
+-  Sensitivity Analysis can be used to further understand the relative value of each employee and for better resource allocation to the future projects.
+
+-  As per the firm's behavior, we have classified that except for paralegal, all the other employee ranks (associate, equity partner, non-equity partner and special counsel) as attorneys. If we have more information on defines job roles, we could implement a different classification.
+
+\newpage
+# Appendix
+
+![$P_{i,k}$ : Hourly Revenue by Employee by Qualification](img/BillingRate.PNG){width="772"}
+
+![$H_{j,k}$ : Total hours requirement by Project by Qualification](img/HoursRequirement.PNG){width="251"}
+
+![$R_{i,k}$ : Ratio of billable/non-billable hours by employee by Qualification](img/BillingRatio.PNG)
+
+![$S_{i,k}$ : Binary Qualification variable by employee by job type](img/EmployeeRank.PNG)
